@@ -1,35 +1,74 @@
-from flask import Flask, render_template
+from flask import Flask, request, jsonify
+from flask_mysqldb import MySQL
+
+from config import config
+""""
+
+Get, post, put, delete
+
+"""
+
 app=Flask(__name__)
 
-@app.route("/")
-def index():
-    titulo='IEVN-1001'
-    list=('Pedro','Juan','Cano')
-    return render_template('uno.html',titulo=titulo, list=list)
-
-@app.route("/user/<string:user>")
-def user(user):
-    return "El Usuario es: {}".format(user)
+con=MySQL(app)
 
 
-@app.route("/numero/<int:n1>")
-def numero(n1):
-    return "El numero es: {}".format(n1)
+@app.route("/alumnos", methods=['GET'])
+def lista_alumnos():
+    try:
+        cursor=con.connection.cursor()
+        sql="select * from alumnos"
+        cursor.execute(sql)
+        datos=cursor.fetchall()
+        alumnos=[]
+        for fila in datos:
+            alumno={"matricula":fila[0], "nombre":fila[1],
+                     "ApPaterno":fila[2], "ApMaterno":fila[3],
+                     "correo":fila[4]}
+            alumnos.append(alumno)
+        return jsonify({"alumnos":alumnos,'mensaje':'lista de alumnos',
+                        'exito':True})
+
+    except Exception as ex:
+        return jsonify({"message": "error{}".format(ex), 'exito':False})
+
+def leer_alumno_db(matricula):
+    try:
+        cursor=con.connection.cursor()
+        sql="select * from alumnos where matricula={}".format(matricula)
+        cursor.execute(sql)
+        datos=cursor.fetchone()
+
+        if datos!=None:
+
+            alumno={"matricula":datos[0], "nombre":datos[1],
+                     "ApPaterno":datos[2], "ApMaterno":datos[3],
+                     "correo":datos[4]}
+            return alumno
+        else:
+            return None
+    except Exception as ex:
+        return jsonify({"message": "error{}".format(ex), 'exito':False})
 
 
-@app.route("/user/<string:nom>/<int:id>")
-def datos(nom, id):
-    return "<h1> ID: {} Nombre: {}".format(id, nom)
+@app.route("/alumnos/<mat>", methods=['GET'])
+def leer_alumno(mat):
+    try:
+        alumno=leer_alumno_bd(mat)
+        if alumno!=None:
+            return jsonify({'alumno':alumno,'mensaje':'Alumno encontrado',
+                            'exito':True}),
+        else:
+            return jsonify({'alumno':alumno,'mensaje':'Alumno no encontrado',
+                            'exito':False}),
 
+    except Exception as ex:
+        return jsonify({"message": "error{}".format(ex), 'exito':False})
 
-@app.route("/suma/<float:n1>/<float:n2>")
-def suma(n1, n2):
-    return "La Suma es: {}".format(n2 + n1)
-
-@app.route("/default")
-@app.route("/default/<string:nom>")
-def nom2(nom='Kas'):
-    return "<h1> El Nombre es: {}</h>".format(nom)
+def pagina_no_encontrada(error):
+    return "<h1>Pagina no encontrada"
 
 if __name__=="__main__":
-    app.run(debug=True)
+    app.config.from_object(config['development'])
+    app.register_error_handler(404,pagina_no_encontrada)
+    app.run(host='0.0.0.0', port=5000)
